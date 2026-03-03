@@ -1,9 +1,9 @@
 """
-NLDATA API v1.0.0
-Creative Commons Commercial-ShareAlike-NoDerivatives 
-https://creativecommons.org/licenses/by-nd/4.0/
+NLDATA API v1.0.1
+Creative Commons Commercial-ShareAlike 
+https://creativecommons.org/licenses/by/4.0/
 contact: nlfar15562547@gmail.com / bsky @nlfar.neocities.org
-last updated timestamp: 0251PM UTC -8 03/02/2026
+last updated timestamp: 0517PM UTC -8 03/02/2026
 
 NLDATA:
 Data is serialized as such:
@@ -14,6 +14,11 @@ char[Length] data
 
 Any atomic datatype (floats, integers) is little endian by default. 
 Strings are handled by the implementation, but assumed to be little-endian.
+
+Matrix2D is a special case:
+First byte of length = width
+Second byte of length = height
+Length is calculated by width*height, and values are stored as float32, and are stored sequentially, left to right, top to bottom.
 
 |   char    |   length  |   type    |   name            |
 |-----------|-----------|-----------|-------------------|
@@ -26,8 +31,8 @@ Strings are handled by the implementation, but assumed to be little-endian.
 |   c       |   1       |   uint8   |   char            |
 |   C       |   1       |   int8    |   signed char     |
 |   o       |   1       |   bool    |   boolean         |
-|   0       |   0       |   false   |   false           |
-|   1       |   0       |   true    |   true            |
+|   0       |   0/1     |   false   |   false           |
+|   1       |   0/1     |   true    |   true            |
 |   s       |   varies  |   string  |   string          |
 |   S       |   varies  |   bytes   |   bytestring      |
 |   v       |   12      |   Vec3    |   Vector3         |
@@ -37,6 +42,7 @@ Strings are handled by the implementation, but assumed to be little-endian.
 |   p       |   varies  |   data    |   PascalData      |
 |   f       |   4       |   float32 |   754f32          |
 |   F       |   8       |   float64 |   754f64          |
+|   m       |   varies  |   2darray |   Matrix2D        |
 """
 
 import struct
@@ -83,7 +89,25 @@ def _encodeValue(tc: str, value: Any) -> bytes:
         return struct.pack("<H", len(raw)) + raw
     if tc == "f":  return struct.pack("<f", value)
     if tc == "F":  return struct.pack("<d", value)
-    raise ValueError("Unknown type char: %r" % tc)
+    if tc == "m":
+        if isinstance(value, (list, tuple)):
+            if len(value) == 3 and isinstance(value[0], int) and isinstance(value[1], int):
+                width, height, raw = value
+            else:
+                rows = value
+                height = len(rows)
+                width = len(rows[0]) if height > 0 else 0
+                raw = [float(x) for row in rows for x in row]
+        else:
+            raise ValueError("Matrix2D value must be (w,h,values) or 2D list of rows")
+        if not (0 <= width <= 255 and 0 <= height <= 255):
+            raise ValueError("Matrix2D width/height must fit in one byte (0-255)")
+        if len(raw) != width * height:
+            raise ValueError(f"Matrix2D data length {len(raw)} does not match width*height {width*height}")
+        header = struct.pack("BB", width, height)
+        body = b"".join(struct.pack("<f", float(v)) for v in raw)
+        return header + body
+    raise ValueError("Unknown type char: %r" % tc)  # no-op for safety
 
 def _decodeValue(tc: str, data: bytes, offset: int):
     if tc == "i":  return struct.unpack_from("<I", data, offset)[0], offset + 4
@@ -112,6 +136,26 @@ def _decodeValue(tc: str, data: bytes, offset: int):
     if tc == "p":
         length = struct.unpack_from("<H", data, offset)[0]; offset += 2
         return bytes(data[offset:offset+length]), offset + length
+    if tc == "m":
+        if offset + 2 > len(data):
+            raise ValueError(f"Not enough data for Matrix2D header at offset {offset}")
+        width = data[offset]; height = data[offset+1]; offset += 2
+        count = width * height
+        if count:
+            fmt = "<" + ("f" * count)
+            # ensure enough bytes
+            needed = 4 * count
+            if offset + needed > len(data):
+                raise ValueError(f"Not enough data for Matrix2D values at offset {offset}")
+            flat = list(struct.unpack_from(fmt, data, offset))
+            offset += needed
+        else:
+            flat = []
+        rows: List[List[float]] = []
+        for r in range(height):
+            start = r * width
+            rows.append(flat[start:start+width])
+        return rows, offset
     if tc == "f":  
         return struct.unpack_from("<f", data, offset)[0], offset + 4
     if tc == "F":  
