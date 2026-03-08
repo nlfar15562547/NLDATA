@@ -182,7 +182,7 @@ class BinaryField:
         return cls(key=key, typeChar=typeChar, value=value), offset
 
     def __repr__(self):
-        if typeChar != 'p': return "BinaryField(key=%r, type=%r, value=%r)" % (self.key, self.typeChar, self.value)
+        if self.typeChar != 'p': return "BinaryField(key=%r, type=%r, value=%r)" % (self.key, self.typeChar, self.value)
         else: return "BinaryField(key=%r, type=%r, length=%r)" % (self.key, self.typeChar, len(self.value))
 
 
