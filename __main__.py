@@ -1,9 +1,9 @@
 """
-NLDATA API v1.0.2
+NLDATA API v1.0.3
 Creative Commons Commercial-ShareAlike 
 https://creativecommons.org/licenses/by/4.0/
 contact: nlfar15562547@gmail.com / bsky @nlfar.neocities.org
-last updated timestamp: 0820PM UTC -8 03/07/2026
+last updated timestamp: 1135AM UTC -8 03/08/2026
 
 NLDATA:
 Data is serialized as such:
@@ -182,7 +182,8 @@ class BinaryField:
         return cls(key=key, typeChar=typeChar, value=value), offset
 
     def __repr__(self):
-        return "BinaryField(key=%r, type=%r, value=%r)" % (self.key, self.typeChar, self.value)
+        if typeChar != 'p': return "BinaryField(key=%r, type=%r, value=%r)" % (self.key, self.typeChar, self.value)
+        else: return "BinaryField(key=%r, type=%r, length=%r)" % (self.key, self.typeChar, len(self.value))
 
 
 @dataclass
