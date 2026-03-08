@@ -1,9 +1,9 @@
 """
-NLDATA API v1.0.1
+NLDATA API v1.0.2
 Creative Commons Commercial-ShareAlike 
 https://creativecommons.org/licenses/by/4.0/
 contact: nlfar15562547@gmail.com / bsky @nlfar.neocities.org
-last updated timestamp: 0517PM UTC -8 03/02/2026
+last updated timestamp: 0820PM UTC -8 03/07/2026
 
 NLDATA:
 Data is serialized as such:
@@ -192,6 +192,11 @@ class BinaryRecord:
     def add(self, key: str, typeChar: str, value: Any = None) -> "BinaryRecord":
         if typeChar == "0": value = False
         elif typeChar == "1": value = True
+        for f in self.fields:
+            if f.key == key:
+                f.typeChar = typeChar
+                f.value = value
+                return self
         self.fields.append(BinaryField(key, typeChar, value))
         return self
 
